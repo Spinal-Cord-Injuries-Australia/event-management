@@ -5,6 +5,7 @@ class Event_Chain_Enricher {
         add_filter('wpgetapi_raw_data', [$this, 'wpgetapi_map_multiple_lookups'], 10, 2);
         add_action('updated_post_meta', [$this, 'scia_after_sessions_meta_update'], 10, 4);
         add_action('updated_post_meta', [$this, 'scia_after_meta_update_for_taxonomies'], 10, 4);
+        add_action('added_post_meta', [$this, 'scia_after_meta_update_for_taxonomies'], 10, 4);
         add_shortcode('custom_sessions', [$this, 'custom_sessions_shortcode']);
     }
 
@@ -258,6 +259,10 @@ class Event_Chain_Enricher {
             update_post_meta($post_id, 'custom_registration_fields', $record['custom_registration_fields'] ?? '');
             update_post_meta($post_id, 'sessions', $record['sessions'] ?? '');
             // ... add other meta fields if needed ...
+
+            $this->scia_after_meta_update_for_taxonomies($post_id, 'speakers', $record['speakers'] ?? '');
+            $this->scia_after_meta_update_for_taxonomies($post_id, 'sponsors', $record['sponsors'] ?? '');
+            $this->scia_after_meta_update_for_taxonomies($post_id, 'buildings', $record['buildings'] ?? '');
         }
 
         return $data;
@@ -295,20 +300,27 @@ class Event_Chain_Enricher {
     }
 
     public function scia_after_meta_update_for_taxonomies($post_id, $meta_key, $meta_value) {
+        error_log("[TAXO_SYNC] meta_key={$meta_key} post_id={$post_id}");
         // Only process supported taxonomy meta keys
         if ( ! in_array( $meta_key, [ 'speakers', 'sponsors', 'buildings' ] ) ) {
+            error_log("[TAXO_SYNC] meta_key {$meta_key} not supported");
             return;
         }
 
         // Handle 'speakers' taxonomy syncing
         if ( $meta_key === 'speakers' ) {
+            error_log("[TAXO_SYNC] Processing speakers for post {$post_id}");
             $speakers = json_decode($meta_value, true);
+            error_log("[TAXO_SYNC] speakers raw: " . var_export($meta_value,1));
             if ( ! is_array( $speakers ) ) {
+                error_log("[TAXO_SYNC] speakers not array");
                 return;
             }
             $term_ids = [];
             foreach ( $speakers as $speaker ) {
+                error_log("[TAXO_SYNC] speaker: " . var_export($speaker,1));
                 if ( empty( $speaker['speaker_name'] ) ) {
+                    error_log("[TAXO_SYNC] speaker_name empty");
                     continue;
                 }
                 $name        = sanitize_text_field( $speaker['speaker_name'] );
@@ -318,15 +330,18 @@ class Event_Chain_Enricher {
                 if ( $existing_term ) {
                     $term_id = $existing_term->term_id;
                     wp_update_term( $term_id, 'speakers', [ 'description' => $description ] );
+                    error_log("[TAXO_SYNC] Updated speaker term {$term_id}");
                 } else {
                     $result = wp_insert_term( $name, 'speakers', [
                         'slug'        => $slug,
                         'description' => $description,
                     ]);
                     if ( is_wp_error( $result ) ) {
+                        error_log("[TAXO_SYNC] wp_insert_term error: " . $result->get_error_message());
                         return;
                     }
                     $term_id = $result['term_id'];
+                    error_log("[TAXO_SYNC] Inserted speaker term {$term_id}");
                 }
                 if ( ! empty( $term_id ) ) {
                     if ( ! empty( $speaker['speaker_id'] ) ) {
@@ -343,12 +358,16 @@ class Event_Chain_Enricher {
             }
             if ( ! empty( $term_ids ) ) {
                 wp_set_object_terms( $post_id, $term_ids, 'speakers' );
+                error_log("[TAXO_SYNC] Set speaker terms: " . implode(',', $term_ids));
             }
         }
         // Handle 'sponsors' taxonomy syncing
         else if ( $meta_key === 'sponsors' ) {
+            error_log("[TAXO_SYNC] Processing sponsors for post {$post_id}");
             $sponsors = json_decode( $meta_value, true );
+            error_log("[TAXO_SYNC] sponsors raw: " . var_export($meta_value,1));
             if ( ! is_array( $sponsors ) ) {
+                error_log("[TAXO_SYNC] sponsors not array");
                 return;
             }
             $existing_terms = wp_get_object_terms( $post_id, 'sponsors', [ 'fields' => 'ids' ] );
@@ -360,7 +379,9 @@ class Event_Chain_Enricher {
             wp_set_object_terms( $post_id, [], 'sponsors' );
             $term_ids = [];
             foreach ( $sponsors as $sponsor ) {
+                error_log("[TAXO_SYNC] sponsor: " . var_export($sponsor,1));
                 if ( empty( $sponsor['sponsor_title'] ) ) {
+                    error_log("[TAXO_SYNC] sponsor_title empty");
                     continue;
                 }
                 $name        = sanitize_text_field( $sponsor['sponsor_title'] );
@@ -370,15 +391,18 @@ class Event_Chain_Enricher {
                 if ( $existing_term ) {
                     $term_id = $existing_term->term_id;
                     wp_update_term( $term_id, 'sponsors', [ 'description' => $description ] );
+                    error_log("[TAXO_SYNC] Updated sponsor term {$term_id}");
                 } else {
                     $result = wp_insert_term( $name, 'sponsors', [
                         'slug'        => $slug,
                         'description' => $description,
                     ] );
                     if ( is_wp_error( $result ) ) {
+                        error_log("[TAXO_SYNC] wp_insert_term error: " . $result->get_error_message());
                         return;
                     }
                     $term_id = $result['term_id'];
+                    error_log("[TAXO_SYNC] Inserted sponsor term {$term_id}");
                 }
                 if ( ! empty( $term_id ) ) {
                     if ( ! empty( $sponsor['sponsor_id'] ) ) {
@@ -395,17 +419,23 @@ class Event_Chain_Enricher {
             }
             if ( ! empty( $term_ids ) ) {
                 wp_set_object_terms( $post_id, $term_ids, 'sponsors' );
+                error_log("[TAXO_SYNC] Set sponsor terms: " . implode(',', $term_ids));
             }
         }
         // Handle 'buildings' taxonomy syncing
         else if($meta_key === 'buildings'){
+            error_log("[TAXO_SYNC] Processing buildings for post {$post_id}");
             $buildings = json_decode($meta_value, 1);
+            error_log("[TAXO_SYNC] buildings raw: " . var_export($meta_value,1));
             if ( ! is_array( $buildings ) ) {
+                error_log("[TAXO_SYNC] buildings not array");
                 return;
             }
             $term_ids = [];
             foreach ( $buildings as $building ) {
+                error_log("[TAXO_SYNC] building: " . var_export($building,1));
                 if ( empty( $building['name'] ) ) {
+                    error_log("[TAXO_SYNC] building name empty");
                     continue;
                 }
                 $name        = sanitize_text_field( $building['name'] );
@@ -415,15 +445,18 @@ class Event_Chain_Enricher {
                 if ( $existing_term ) {
                     $term_id = $existing_term->term_id;
                     wp_update_term( $term_id, 'buildings', [ 'description' => $description ] );
+                    error_log("[TAXO_SYNC] Updated building term {$term_id}");
                 } else {
                     $result = wp_insert_term( $name, 'buildings', [
                         'slug'        => $slug,
                         'description' => $description,
                     ]);
                     if ( is_wp_error( $result ) ) {
+                        error_log("[TAXO_SYNC] wp_insert_term error: " . $result->get_error_message());
                         return;
                     }
                     $term_id = $result['term_id'];
+                    error_log("[TAXO_SYNC] Inserted building term {$term_id}");
                 }
                 if ( ! empty( $term_id ) ) {
                     if ( ! empty( $building['building_id'] ) ) {
@@ -446,6 +479,7 @@ class Event_Chain_Enricher {
             }
             if ( ! empty( $term_ids ) ) {
                 wp_set_object_terms( $post_id, $term_ids, 'buildings' );
+                error_log("[TAXO_SYNC] Set building terms: " . implode(',', $term_ids));
             }
         }
     }

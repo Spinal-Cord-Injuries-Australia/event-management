@@ -33,6 +33,37 @@ require_once plugin_dir_path(__FILE__) . 'form_edits.php';
 // For future extension, it is recommended to move classes to an includes/ folder and implement autoloading via spl_autoload_register or composer
 // ---
 
+// Регистрация таксономий speakers, sponsors, buildings для events
+add_action('init', function() {
+    // Speakers
+    register_taxonomy('speakers', ['events'], [
+        'label'        => __('Speakers', 'event-management-plugin'),
+        'public'       => true,
+        'show_ui'      => true,
+        'show_admin_column' => true,
+        'hierarchical' => false,
+        'rewrite'      => ['slug' => 'speakers'],
+    ]);
+    // Sponsors
+    register_taxonomy('sponsors', ['events'], [
+        'label'        => __('Sponsors', 'event-management-plugin'),
+        'public'       => true,
+        'show_ui'      => true,
+        'show_admin_column' => true,
+        'hierarchical' => false,
+        'rewrite'      => ['slug' => 'sponsors'],
+    ]);
+    // Buildings
+    register_taxonomy('buildings', ['events'], [
+        'label'        => __('Buildings', 'event-management-plugin'),
+        'public'       => true,
+        'show_ui'      => true,
+        'show_admin_column' => true,
+        'hierarchical' => false,
+        'rewrite'      => ['slug' => 'buildings'],
+    ]);
+});
+
 class Event_Management_Plugin {
     public function __construct() {
         add_action('admin_menu', [$this, 'add_settings_page']);
