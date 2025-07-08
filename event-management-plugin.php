@@ -33,7 +33,6 @@ require_once plugin_dir_path(__FILE__) . 'form_edits.php';
 // For future extension, it is recommended to move classes to an includes/ folder and implement autoloading via spl_autoload_register or composer
 // ---
 
-// Регистрация таксономий speakers, sponsors, buildings для events
 add_action('init', function() {
     // Speakers
     register_taxonomy('speakers', ['events'], [
