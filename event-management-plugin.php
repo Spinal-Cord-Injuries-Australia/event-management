@@ -155,4 +155,21 @@ class Event_Management_Plugin {
 // Plugin initialization
 add_action('plugins_loaded', function() {
     new Event_Management_Plugin();
+});
+
+// Enqueue custom JS and CSS for event radio buttons
+add_action('wp_enqueue_scripts', function() {
+    wp_enqueue_script(
+        'event-coming-radio',
+        plugin_dir_url(__FILE__) . 'event-coming-radio.js',
+        [],
+        '1.0',
+        true // Load in footer
+    );
+    wp_enqueue_style(
+        'event-coming-radio-style',
+        plugin_dir_url(__FILE__) . 'event-coming-radio.css',
+        [],
+        '1.0'
+    );
 }); 

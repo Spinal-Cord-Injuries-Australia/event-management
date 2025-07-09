@@ -5,7 +5,7 @@ A universal WordPress plugin for event management with OOP architecture, externa
 ## What the plugin does
 1. Configures forms and API integration via WordPress admin panel
 2. Processes form submissions and enriches data via external APIs
-3. Automatically creates/updates taxonomies (speakers, sponsors, buildings)
+3. Works with existing taxonomies (speakers, sponsors, buildings) - these must be created manually
 4. Displays forms and data according to your settings
 5. All parameters configurable without code editing
 
@@ -13,8 +13,9 @@ A universal WordPress plugin for event management with OOP architecture, externa
 1. Copy plugin folder to `wp-content/plugins/`
 2. Activate via WordPress admin panel
 3. Install required plugins: Gravity Forms, WPGetAPI, JetEngine
-4. **Note:** This plugin does not import or configure external APIs by itself. API import and data mapping must be set up manually using the WPGetAPI plugin. Please ensure you configure the necessary data mapping in the WPGetAPI settings according to your needs.
-5. Configure settings at "Settings → Event Management"
+4. **Important:** This plugin does not automatically create taxonomies (Buildings, Sponsors, Speakers) for the event post type. These taxonomies must be created manually in WordPress admin or through custom code.
+5. **Note:** This plugin does not import or configure external APIs by itself. API import and data mapping must be set up manually using the WPGetAPI plugin. Please ensure you configure the necessary data mapping in the WPGetAPI settings according to your needs.
+6. Configure settings at "Settings → Event Management"
 
 ## Multi-site Usage
 - Copy plugin to each site in your network
