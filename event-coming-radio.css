@@ -1,0 +1,10 @@
+#coming_radio_wrapper>div label {
+  color: #000;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#coming_radio_wrapper {
+  min-width: 100%;
+}

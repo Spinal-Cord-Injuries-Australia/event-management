@@ -48,6 +48,7 @@ class Event_Form_Edits {
 				'adminLabel' => $label,
 				'isRequired' => false,
 				'type'       => 'text',
+				'inputName'  => $uuid,
 			];
 			if ($type === 'boolean') {
 				$choices         = explode(',', $row['custom_registration_field_boolean_choices'] ?? 'Yes,No');
@@ -86,19 +87,36 @@ class Event_Form_Edits {
 	}
 
 	public function save_custom_registration_fields($entry, $form) {
+		error_log('[GF DEBUG] save_custom_registration_fields called');
 		$event_id = get_the_ID() ?: url_to_postid(wp_get_referer());
+		error_log('[GF DEBUG] event_id: ' . print_r($event_id, true));
 		if (!$event_id || !is_numeric($event_id)) {
+			error_log('[GF DEBUG] invalid event_id');
 			return $entry;
 		}
 		$custom_fields = get_post_meta($event_id, 'custom_registration_fields', true);
+		error_log('[GF DEBUG] custom_fields: ' . print_r($custom_fields, true));
 		if ($custom_fields && is_array($custom_fields)) {
 			$custom_fields = isset($custom_fields[0]) ? $custom_fields[0] : $custom_fields;
 			foreach ($custom_fields as $row) {
 				$uuid = $row['custom_registration_field_id'] ?? '';
+				$label = $row['custom_registration_field_label'] ?? '';
+				error_log('[GF DEBUG] row: ' . print_r($row, true));
+				// Найти поле с таким label в форме
+				foreach ($form['fields'] as $f) {
+					error_log('[GF DEBUG] compare: label=' . $label . ' f->label=' . $f->label);
+					if ($f->label === $label && isset($entry[$f->id])) {
+						error_log('[GF DEBUG] MATCH: entry[' . $uuid . '] = entry[' . $f->id . '] = ' . print_r($entry[$f->id], true));
+						$entry[$uuid] = $entry[$f->id];
+					}
+				}
+				// Если uuid есть, но не заполнено — оставить пустым
 				if ($uuid && !isset($entry[$uuid])) {
+					error_log('[GF DEBUG] EMPTY: entry[' . $uuid . '] set to empty string');
 					$entry[$uuid] = '';
 				}
 			}
+			error_log('[GF DEBUG] entry before update: ' . print_r($entry, true));
 			GFAPI::update_entry($entry);
 		}
 		return $entry;
