@@ -19,15 +19,68 @@ if (version_compare(PHP_VERSION, '7.4', '<')) {
     return;
 }
 
+// Plugin activation hook
+register_activation_hook(__FILE__, 'event_management_plugin_activate');
+
+function event_management_plugin_activate() {
+    // Check if required files exist
+    $plugin_dir = plugin_dir_path(__FILE__);
+    $required_files = [
+        'chain_&_enrich_events_endpoint.php',
+        'customise_nested_form_text.php',
+        'form_edits.php'
+    ];
+    
+    $missing_files = [];
+    foreach ($required_files as $file) {
+        if (!file_exists($plugin_dir . $file)) {
+            $missing_files[] = $file;
+        }
+    }
+    
+    if (!empty($missing_files)) {
+        deactivate_plugins(plugin_basename(__FILE__));
+        wp_die(
+            'Event Management Plugin cannot be activated. Missing required files: ' . implode(', ', $missing_files),
+            'Plugin Activation Error',
+            ['back_link' => true]
+        );
+    }
+    
+    // Set default options if they don't exist
+    if (!get_option('event_management_event_field_id')) {
+        add_option('event_management_event_field_id', '1');
+    }
+}
+
 // Load plugin textdomain for localization
 add_action('plugins_loaded', function() {
     load_plugin_textdomain('event-management-plugin', false, dirname(plugin_basename(__FILE__)) . '/languages');
 });
 
-// Include modules (OOP classes)
-require_once plugin_dir_path(__FILE__) . 'chain_&_enrich_events_endpoint.php';
-require_once plugin_dir_path(__FILE__) . 'customise_nested_form_text.php';
-require_once plugin_dir_path(__FILE__) . 'form_edits.php';
+// Include modules (OOP classes) - with error handling
+$plugin_dir = plugin_dir_path(__FILE__);
+
+// Check and include chain_&_enrich_events_endpoint.php
+if (file_exists($plugin_dir . 'chain_&_enrich_events_endpoint.php')) {
+    require_once $plugin_dir . 'chain_&_enrich_events_endpoint.php';
+} else {
+    error_log('Event Management Plugin: chain_&_enrich_events_endpoint.php not found');
+}
+
+// Check and include customise_nested_form_text.php
+if (file_exists($plugin_dir . 'customise_nested_form_text.php')) {
+    require_once $plugin_dir . 'customise_nested_form_text.php';
+} else {
+    error_log('Event Management Plugin: customise_nested_form_text.php not found');
+}
+
+// Check and include form_edits.php
+if (file_exists($plugin_dir . 'form_edits.php')) {
+    require_once $plugin_dir . 'form_edits.php';
+} else {
+    error_log('Event Management Plugin: form_edits.php not found');
+}
 
 // ---
 // For future extension, it is recommended to move classes to an includes/ folder and implement autoloading via spl_autoload_register or composer
@@ -67,15 +120,46 @@ class Event_Management_Plugin {
     public function __construct() {
         add_action('admin_menu', [$this, 'add_settings_page']);
         add_action('admin_init', [$this, 'register_settings']);
-        // Initialize modules (after converting them to classes)
+        
+        // Initialize modules with dependency checks
+        $this->initialize_modules();
+    }
+    
+    private function initialize_modules() {
+        // Check if required WordPress plugins/functions exist
+        if (!function_exists('wpgetapi_endpoint')) {
+            error_log('Event Management Plugin: WPGetAPI plugin not found. Some features may not work.');
+        }
+        
+        if (!class_exists('GFAPI')) {
+            error_log('Event Management Plugin: Gravity Forms not found. Some features may not work.');
+        }
+        
+        // Initialize Event_Chain_Enricher
         if (class_exists('Event_Chain_Enricher')) {
-            new Event_Chain_Enricher();
+            try {
+                new Event_Chain_Enricher();
+            } catch (Exception $e) {
+                error_log('Event Management Plugin: Error initializing Event_Chain_Enricher: ' . $e->getMessage());
+            }
         }
+        
+        // Initialize Event_Customise_Nested_Form_Text
         if (class_exists('Event_Customise_Nested_Form_Text')) {
-            new Event_Customise_Nested_Form_Text();
+            try {
+                new Event_Customise_Nested_Form_Text();
+            } catch (Exception $e) {
+                error_log('Event Management Plugin: Error initializing Event_Customise_Nested_Form_Text: ' . $e->getMessage());
+            }
         }
+        
+        // Initialize Event_Form_Edits
         if (class_exists('Event_Form_Edits')) {
-            new Event_Form_Edits();
+            try {
+                new Event_Form_Edits();
+            } catch (Exception $e) {
+                error_log('Event Management Plugin: Error initializing Event_Form_Edits: ' . $e->getMessage());
+            }
         }
     }
 
@@ -98,6 +182,7 @@ class Event_Management_Plugin {
         register_setting('event_management_options', 'event_management_parent_form_ids');
         register_setting('event_management_options', 'event_management_nested_field_ids');
         register_setting('event_management_options', 'event_management_webhook_form_ids');
+        register_setting('event_management_options', 'event_management_event_field_id');
     }
 
     public function settings_page() {
@@ -143,6 +228,10 @@ class Event_Management_Plugin {
                             <th scope="row"><?php _e('Webhook Form ID(s) (comma separated)', 'event-management-plugin'); ?></th>
                             <td><input style="min-width: 400px;" type="text" name="event_management_webhook_form_ids" value="<?php echo esc_attr(get_option('event_management_webhook_form_ids')); ?>" /></td>
                         </tr>
+                        <tr valign="top">
+                            <th scope="row"><?php _e('Event Field ID', 'event-management-plugin'); ?></th>
+                            <td><input style="min-width: 400px;" type="text" name="event_management_event_field_id" value="<?php echo esc_attr(get_option('event_management_event_field_id', '1')); ?>" placeholder="1" /></td>
+                        </tr>
                     </tbody>
                 </table>
                 <?php submit_button(); ?>
@@ -159,17 +248,27 @@ add_action('plugins_loaded', function() {
 
 // Enqueue custom JS and CSS for event radio buttons
 add_action('wp_enqueue_scripts', function() {
-    wp_enqueue_script(
-        'event-coming-radio',
-        plugin_dir_url(__FILE__) . 'event-coming-radio.js',
-        [],
-        '1.0',
-        true // Load in footer
-    );
-    wp_enqueue_style(
-        'event-coming-radio-style',
-        plugin_dir_url(__FILE__) . 'event-coming-radio.css',
-        [],
-        '1.0'
-    );
+    $plugin_dir = plugin_dir_path(__FILE__);
+    $plugin_url = plugin_dir_url(__FILE__);
+    
+    // Check if JS file exists before enqueuing
+    if (file_exists($plugin_dir . 'event-coming-radio.js')) {
+        wp_enqueue_script(
+            'event-coming-radio',
+            $plugin_url . 'event-coming-radio.js',
+            [],
+            '1.0',
+            true // Load in footer
+        );
+    }
+    
+    // Check if CSS file exists before enqueuing
+    if (file_exists($plugin_dir . 'event-coming-radio.css')) {
+        wp_enqueue_style(
+            'event-coming-radio-style',
+            $plugin_url . 'event-coming-radio.css',
+            [],
+            '1.0'
+        );
+    }
 }); 
