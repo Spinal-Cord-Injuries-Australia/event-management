@@ -248,6 +248,7 @@ add_action('plugins_loaded', function() {
 
 // Enqueue custom JS and CSS for event radio buttons
 add_action('wp_enqueue_scripts', function() {
+<<<<<<< HEAD
     $plugin_dir = plugin_dir_path(__FILE__);
     $plugin_url = plugin_dir_url(__FILE__);
     
@@ -271,4 +272,19 @@ add_action('wp_enqueue_scripts', function() {
             '1.0'
         );
     }
+=======
+    wp_enqueue_script(
+        'event-coming-radio',
+        plugin_dir_url(__FILE__) . 'event-coming-radio.js',
+        [],
+        '1.0',
+        true // Load in footer
+    );
+    wp_enqueue_style(
+        'event-coming-radio-style',
+        plugin_dir_url(__FILE__) . 'event-coming-radio.css',
+        [],
+        '1.0'
+    );
+>>>>>>> 5d66c650392221ea5cc461b8b0285f68ff541902
 }); 
